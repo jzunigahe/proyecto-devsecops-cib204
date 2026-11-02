@@ -1,26 +1,25 @@
 # ============================================================================
 #  Dockerfile  -  Servicio de cifrado
-#  >>> VERSION INSEGURA (rama inseguro) <<<
-#  Contiene malas practicas INTENCIONADAS que Trivy debe reportar.
+#  >>> VERSION CORREGIDA <<<
+#  [VULN-11] imagen base con version fija y ligera (node:24-alpine).
+#  [VULN-12] solo se copian los archivos necesarios (+ .dockerignore).
+#  [VULN-13] el contenedor corre con un usuario sin privilegios (node).
 # ============================================================================
 
-# [VULN-11] Imagen base "latest" (no reproducible) y pesada, con muchos
-#   paquetes de sistema vulnerables. La solucion es una etiqueta fija y una
-#   imagen slim (p.ej. node:20-slim).  CWE-1104 / mala practica de imagen.
-FROM node:latest
-
+# Etapa 1: instalar solo las dependencias de produccion
+FROM node:24-alpine AS build
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY servidor.js cifrado.js auth.js config.js db.js ./
 
-# [VULN-12] Se copia TODO el contexto (incluye .env, llaves y node_modules).
-#   Puede filtrar secretos dentro de la imagen.  CWE-538
-COPY . .
-
-# Instala dependencias en la imagen (sin fijar el lockfile con npm ci).
-RUN npm install
-
+# Etapa 2: imagen final minima
+FROM node:24-alpine
+# Se quita npm de la imagen final: no se usa en ejecucion y trae
+# dependencias propias que Trivy reportaria.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+WORKDIR /app
+COPY --from=build --chown=node:node /app /app
+USER node
 EXPOSE 3000
-
-# [VULN-13] El contenedor corre como ROOT (no hay instruccion USER).
-#   Viola el principio de minimo privilegio (NIST SP 800-190). Trivy lo marca.
-#   CWE-250 (Execution with Unnecessary Privileges)
 CMD ["node", "servidor.js"]

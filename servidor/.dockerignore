@@ -1,0 +1,7 @@
+node_modules
+.env
+*.pem
+*.test.js
+prueba.js
+Dockerfile
+.dockerignore
