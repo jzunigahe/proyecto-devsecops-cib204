@@ -1,42 +1,45 @@
 // ============================================================================
 //  db.js  -  Acceso a datos (bitacora de operaciones)
-//  >>> VERSION INSEGURA <<<
+//  >>> VERSION CORREGIDA <<<
 // ============================================================================
 //
-//  Este modulo simula una pequena base de datos donde se guarda una bitacora
-//  de las operaciones de cifrado. Se usa el driver 'mysql' (JavaScript puro)
-//  para que el analisis estatico reconozca el "sink" de SQL.
+//  [VULN-3] corregido: consulta parametrizada (placeholder '?') con el
+//  driver mysql2. La respuesta ya no devuelve el SQL ejecutado.  CWE-89
 //
-//  Nota didactica: no se necesita un MySQL real corriendo. Si la conexion
-//  falla, la consulta se atrapa y el servicio sigue vivo; lo importante para
-//  el laboratorio es que SAST/CodeQL detecten la INYECCION SQL en el codigo.
+//  Nota didactica: no se necesita un MySQL real. Si no hay DATABASE_URL o la
+//  conexion falla, se devuelve una lista vacia y el servicio sigue vivo.
 
-const mysql = require('mysql');
+const mysql = require('mysql2');
 const config = require('./config');
 
 let conexion = null;
-try {
-  conexion = mysql.createConnection(config.DATABASE_URL);
-} catch (e) {
-  conexion = null;
+
+function obtenerConexion() {
+  if (conexion || !config.DATABASE_URL) {
+    return conexion;
+  }
+  try {
+    conexion = mysql.createConnection(config.DATABASE_URL);
+    conexion.on('error', () => {
+      conexion = null;
+    });
+  } catch (e) {
+    conexion = null;
+  }
+  return conexion;
 }
 
-// [VULN-3] Inyeccion de SQL por concatenacion directa de entrada del usuario.
-//   El parametro 'nombre' viaja SIN sanitizar dentro de la consulta.
-//   Un atacante puede enviar:  ' OR '1'='1  y alterar la logica.
-//   Lo detectan CodeQL (js/sql-injection) y Semgrep.
-//   La solucion son consultas parametrizadas (placeholders '?').
-//   CWE-89 (SQL Injection)
 function buscarBitacora(nombre, callback) {
-  const sql = "SELECT * FROM bitacora WHERE usuario = '" + nombre + "'";
-  if (!conexion) {
-    return callback(null, { sqlEjecutado: sql, filas: [] });
+  const sql = 'SELECT * FROM bitacora WHERE usuario = ?';
+  const con = obtenerConexion();
+  if (!con) {
+    return callback(null, { filas: [] });
   }
-  conexion.query(sql, function (err, filas) {
+  con.query(sql, [String(nombre)], (err, filas) => {
     if (err) {
-      return callback(null, { sqlEjecutado: sql, filas: [], nota: err.code });
+      return callback(null, { filas: [] });
     }
-    return callback(null, { sqlEjecutado: sql, filas: filas });
+    return callback(null, { filas });
   });
 }
 
