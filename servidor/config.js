@@ -1,31 +1,26 @@
 // ============================================================================
 //  config.js  -  Configuracion del servicio
-//  >>> VERSION INSEGURA <<<  Contiene secretos quemados a proposito.
+//  >>> VERSION CORREGIDA <<<
+//  Los secretos se leen SOLO de variables de entorno (nunca del repositorio).
+//  [VULN-2] corregido: se eliminaron las credenciales quemadas.  CWE-798
 // ============================================================================
 
-// [VULN-2] Secretos quemados en el codigo (hardcoded credentials).
-//   Nunca deben vivir en el repositorio: los detecta Gitleaks y Semgrep.
-//   La solucion es leerlos de variables de entorno (process.env) y NUNCA
-//   versionarlos. Las llaves de abajo son de ejemplo/ficticias.
-//   CWE-798 (Use of Hard-coded Credentials) / CWE-259
-
 const config = {
-  // Credencial de nube ficticia (patron que Gitleaks reconoce como AWS)
-  AWS_ACCESS_KEY_ID: 'AKIAIOSFODNN7EXAMPLE',
-  AWS_SECRET_ACCESS_KEY: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+  // Cadena de conexion a la base de datos: llega por variable de entorno.
+  DATABASE_URL: process.env.DATABASE_URL,
 
-  // Secreto para firmar/verificar tokens propios: quemado (mal)
-  JWT_SECRET: 'sup3r-s3cr3t0-cib204-no-lo-cambies',
+  // (El control de acceso se corrige en el paso 3.)
+  AUTH_ENABLED: process.env.AUTH_ENABLED === 'true',
 
-  // Cadena de conexion con contrasena en claro (mal)
-  DATABASE_URL: 'mysql://root:Admin1234@localhost:3306/appmovil',
-
-  // Control de acceso DESACTIVADO por defecto (mal)
-  AUTH_ENABLED: process.env.AUTH_ENABLED === 'true' ? true : false,
-
-  // Parametros de Keycloak (IAM)
+  // Keycloak (IAM)
+  //  - KEYCLOAK_URL: direccion interna para descargar las llaves publicas (JWKS).
+  //  - KEYCLOAK_ISSUER: emisor esperado dentro del token (campo "iss").
   KEYCLOAK_URL: process.env.KEYCLOAK_URL || 'http://localhost:8080',
   KEYCLOAK_REALM: process.env.KEYCLOAK_REALM || 'appmovil',
+  KEYCLOAK_ISSUER: process.env.KEYCLOAK_ISSUER,
+
+  // Origen(es) de la app que pueden llamar a la API (CORS). Separados por coma.
+  ORIGEN_PERMITIDO: process.env.ORIGEN_PERMITIDO,
 
   PUERTO: process.env.PORT || 3000,
 };

@@ -1,9 +1,8 @@
 # Dependencias
 node_modules/
 
-# Nota didactica (rama inseguro): a proposito NO se ignoran .env ni *.pem,
-# por eso quedan versionados y Gitleaks los detecta. En la rama solucion se
-# agregan las lineas:
-#   .env
-#   *.pem
-#   clave_privada*.pem
+# Secretos: nunca se versionan (VULN-2 corregido)
+.env
+*.env
+*.pem
+clave_privada*.pem
