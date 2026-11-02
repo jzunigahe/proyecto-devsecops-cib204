@@ -1,45 +1,42 @@
 // ============================================================================
 //  auth.js  -  Gestion de identidad y acceso (IAM)
-//  >>> VERSION INSEGURA <<<
+//  >>> VERSION CORREGIDA <<<
 // ============================================================================
 //
-//  Middleware que deberia exigir un token JWT valido emitido por Keycloak.
-//  En esta version esta debilitado a proposito.
+//  [VULN-4] corregido: el token JWT se valida contra las llaves publicas
+//  (JWKS) de Keycloak, solo se acepta RS256 y se verifica el emisor.
+//  CWE-347 / CWE-287 / CWE-306
 
-const jwt = require('jsonwebtoken');
+const { expressjwt } = require('express-jwt');
+const jwksRsa = require('jwks-rsa');
 const config = require('./config');
 
-// [VULN-4] Verificacion de JWT insegura.
-//   - No se valida la firma con la llave publica de Keycloak.
-//   - Se acepta el algoritmo 'none' y se decodifica sin verificar.
-//   - El secreto de respaldo esta quemado (config.JWT_SECRET).
-//   Un atacante puede fabricar un token con alg=none y entrar.
-//   La solucion es validar la firma contra el JWKS del emisor y restringir
-//   los algoritmos permitidos (RS256).
-//   CWE-347 (Improper Verification of Cryptographic Signature) / CWE-287
+// Lista de identificadores de token (jti) revocados. En produccion viviria en
+// una base de datos o cache compartida.
+const tokensRevocados = new Set();
+
+const validarJwt = expressjwt({
+  secret: jwksRsa.expressJwtSecret({
+    cache: true,
+    rateLimit: true,
+    jwksRequestsPerMinute: 10,
+    jwksUri: `${config.KEYCLOAK_URL}/realms/${config.KEYCLOAK_REALM}/protocol/openid-connect/certs`,
+  }),
+  algorithms: ['RS256'],
+  issuer: config.KEYCLOAK_ISSUER,
+  isRevoked: async (req, token) => tokensRevocados.has(token && token.payload && token.payload.jti),
+});
 
 function requiereAuth(req, res, next) {
-  // Si el control de acceso esta apagado, deja pasar a cualquiera.
   if (!config.AUTH_ENABLED) {
     return next();
   }
-
-  const cabecera = req.headers['authorization'] || '';
-  const token = cabecera.replace('Bearer ', '');
-
-  if (!token) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
-
-  try {
-    // INSEGURO: decodifica sin verificar la firma y admite 'none'.
-    const payload = jwt.decode(token) ||
-      jwt.verify(token, config.JWT_SECRET, { algorithms: ['none', 'HS256'] });
-    req.usuario = payload;
+  return validarJwt(req, res, (err) => {
+    if (err) {
+      return res.status(401).json({ error: 'No autorizado' });
+    }
     return next();
-  } catch (e) {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
+  });
 }
 
-module.exports = { requiereAuth };
+module.exports = { requiereAuth, tokensRevocados };

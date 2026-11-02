@@ -9,8 +9,9 @@ const config = {
   // Cadena de conexion a la base de datos: llega por variable de entorno.
   DATABASE_URL: process.env.DATABASE_URL,
 
-  // (El control de acceso se corrige en el paso 3.)
-  AUTH_ENABLED: process.env.AUTH_ENABLED === 'true',
+  // Control de acceso ENCENDIDO por defecto. Solo se apaga si se pide
+  // explicitamente (por ejemplo, en las pruebas automaticas).
+  AUTH_ENABLED: process.env.AUTH_ENABLED !== 'false',
 
   // Keycloak (IAM)
   //  - KEYCLOAK_URL: direccion interna para descargar las llaves publicas (JWKS).

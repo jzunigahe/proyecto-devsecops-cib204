@@ -11,9 +11,16 @@ services:
     environment:
       # El control de acceso arranca APAGADO (rama insegura). Se activa en la
       # Seccion de IAM poniendo AUTH_ENABLED=true.
-      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      # Control de acceso ENCENDIDO por defecto (VULN-4 corregido).
+      - AUTH_ENABLED=${AUTH_ENABLED:-true}
+      # JWKS por la red interna de Docker; emisor = URL publica de Keycloak.
       - KEYCLOAK_URL=http://keycloak:8080
       - KEYCLOAK_REALM=appmovil
+      - KEYCLOAK_ISSUER=https://${CODESPACE_NAME}-8080.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}/realms/appmovil
+      # Unico origen que puede llamar a la API desde el navegador: la app (8081).
+      - ORIGEN_PERMITIDO=https://${CODESPACE_NAME}-8081.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}
+      # Secretos: llegan desde el .env local (que NO se sube al repo).
+      - DATABASE_URL=${DATABASE_URL:-}
     restart: unless-stopped
 
   keycloak:
